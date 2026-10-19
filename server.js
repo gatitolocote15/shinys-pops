@@ -185,7 +185,10 @@ app.listen(PORT, () => {
   `);
 });
 
-// Keepalive
+// Keepalive — self-ping cada 14 min para que Render no duerma el server
+const SELF_URL = 'https://shinys-pops.onrender.com/health';
 setInterval(() => {
-  console.log(`[KEEPALIVE] ${new Date().toISOString()}`);
-}, 25000);
+  fetch(SELF_URL)
+    .then(() => console.log(`[KEEPALIVE] ${new Date().toISOString()}`))
+    .catch(e => console.error('[KEEPALIVE ERROR]', e.message));
+}, 14 * 60 * 1000);
